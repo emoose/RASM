@@ -189,8 +189,8 @@ int ParseCommandLine(int argc, const char* argv[])
             switch (Options::GameTarget)
             {
             case GameTarget::GTAIV: Decompiler = make_unique<DecompileGTAIV>(GameTarget::GTAIV); break;
-            case GameTarget::RDR: Decompiler = make_unique<DecompileRDR>(GameTarget::RDR); break;
-            case GameTarget::RDR_SCO: Decompiler = make_unique<DecompileRDR>(GameTarget::RDR_SCO); break;
+            case GameTarget::RDR: Decompiler = make_unique<DecompileRDR>(GameTarget::RDR, Options::Platform == Platform::PC); break;
+            case GameTarget::RDR_SCO: Decompiler = make_unique<DecompileRDR>(GameTarget::RDR_SCO, Options::Platform == Platform::PC); break;
             case GameTarget::GTAV:
             {
                 if(Options::Platform == Platform::PC)

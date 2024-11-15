@@ -969,10 +969,21 @@ void DecompileBase::PrintCallNative(uint32_t nativeIndex, int32_t nativeParamCou
     {
         //write unnamed native
         Out += "_0x";
-        if (Is64Bit)
-            Out += Utils::DataConversion::IntToHex(Utils::Bitwise::SwapEndian(nativeValue));
+
+        if (Options::Platform == Platform::PC && (Options::GameTarget == GameTarget::RDR || Options::GameTarget == GameTarget::RDR_SCO))
+        {
+          if (Is64Bit)
+            Out += Utils::DataConversion::IntToHex(nativeValue);
+          else
+            Out += Utils::DataConversion::IntToHex((uint32_t)nativeValue);
+        }
         else
+        {
+          if (Is64Bit)
+            Out += Utils::DataConversion::IntToHex(Utils::Bitwise::SwapEndian(nativeValue));
+          else
             Out += Utils::DataConversion::IntToHex(Utils::Bitwise::SwapEndian((uint32_t)nativeValue));
+        }
 
         Out += " ";
         Out += to_string(nativeParamCount);
@@ -993,10 +1004,20 @@ void DecompileBase::PrintCallNative(uint32_t nativeIndex, int32_t nativeParamCou
         if (foundNative != NativeMap.end())
         {
             Out += ", N: _0x";
-            if (Is64Bit)
-                Out += Utils::DataConversion::IntToHex(Utils::Bitwise::SwapEndian(nativeValue));
+            if (Options::Platform == Platform::PC && (Options::GameTarget == GameTarget::RDR || Options::GameTarget == GameTarget::RDR_SCO))
+            {
+              if (Is64Bit)
+                Out += Utils::DataConversion::IntToHex(nativeValue);
+              else
+                Out += Utils::DataConversion::IntToHex((uint32_t)nativeValue);
+            }
             else
+            {
+              if (Is64Bit)
+                Out += Utils::DataConversion::IntToHex(Utils::Bitwise::SwapEndian(nativeValue));
+              else
                 Out += Utils::DataConversion::IntToHex(Utils::Bitwise::SwapEndian((uint32_t)nativeValue));
+            }
         }
     }
 
@@ -1289,7 +1310,10 @@ void DecompileRDR::LogCallLabel(uint8_t callType)
 void DecompileRDR::ReadCallNative()
 {
     CurrentOpSize = 3;
-    uint16_t nativeData = Utils::Bitwise::SwapEndian(Reader->ReadUInt16(CurrentReadPos + 1));
+    uint16_t nativeData = Reader->ReadUInt16(CurrentReadPos + 1);
+
+    if (Options::Platform != Platform::PC)
+      nativeData = Utils::Bitwise::SwapEndian(nativeData);
 
     PrintCallNative(GetCallIndex(nativeData), GetArgCountFromIndex(&nativeData), FunctionHasReturn(&nativeData));
 }
@@ -1375,6 +1399,17 @@ void DecompileRDR::OpenScript(vector<uint8_t>& data)
         memcpy(data.data(), decompressedData.data(), decompressedSize);
     }
     break;
+    case Platform::PC:
+    {
+      vector<uint8_t> decompressedData(decompressedSize);
+
+      Utils::Compression::ZSTD_DecompressNew(CurrentReadPos, data.size() - sizeof(CSRHeader), decompressedData);
+      decompressedSize = decompressedData.size();
+
+      data.resize(decompressedSize);
+      memcpy(data.data(), decompressedData.data(), decompressedSize);
+    }
+    break;
     }
 
     uint32_t headerLocation = GetObjectStartPageOffset(flags);
@@ -1388,9 +1423,11 @@ void DecompileRDR::OpenScript(vector<uint8_t>& data)
     else
         Utils::System::Throw("Invalid Header Location");
 
+    constexpr int MAGIC_CONSOLE = 0xA8D74300;
+    constexpr int MAGIC_PC = 0x0016E444;
 
-    auto unk = Reader->ReadUInt32(CurrentReadPos);
-    if (Reader->ReadUInt32(CurrentReadPos) != 0xA8D74300)
+    auto magic = Reader->ReadUInt32(CurrentReadPos);
+    if (magic != MAGIC_CONSOLE && magic != MAGIC_PC)
         Utils::System::Throw("Header Not Found");
 
     CommonHeader.HeaderPtr = CurrentReadPos;

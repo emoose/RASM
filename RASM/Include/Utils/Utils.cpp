@@ -15,7 +15,7 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/tokenizer.hpp>
 #include <unordered_map>
-
+#include <zstd.h>
 
 using namespace std;
 using namespace Utils::System;
@@ -1015,6 +1015,70 @@ namespace Utils
             case Z_VERSION_ERROR: return "Z_VERSION_ERROR";
             }
             return "UNK_ERR" + to_string(errorcode);
+        }
+
+        void ZSTD_DecompressNew(uint8_t* in, uint32_t inSize, std::vector<uint8_t>& out) {
+          size_t ec;
+          size_t have;
+          ZSTD_DStream* dstream = nullptr;
+          ZSTD_inBuffer input;
+          ZSTD_outBuffer output;
+          unsigned char outbuf[CHUNK];
+          uint32_t inIndex = 0;
+
+          out.clear();
+
+          // Create the decompression stream
+          dstream = ZSTD_createDStream();
+          if (!dstream) {
+            throw std::runtime_error("ZSTD_createDStream Failed");
+          }
+
+          // Initialize the decompression stream
+          ec = ZSTD_initDStream(dstream);
+          if (ZSTD_isError(ec)) {
+            ZSTD_freeDStream(dstream);
+            std::cerr << "Error: " << ZSTD_getErrorName(ec) << '\n';
+            throw std::runtime_error("ZSTD_initDStream Failed");
+          }
+
+          // Decompress the input data in chunks
+          while (inIndex < inSize) {
+            // Prepare the input buffer
+            uint32_t remaining = inSize - inIndex;
+            uint32_t sizeToCopy = remaining > CHUNK ? CHUNK : remaining;
+
+            input.src = in + inIndex;
+            input.size = sizeToCopy;
+            input.pos = 0;
+            inIndex += sizeToCopy;
+
+            // Decompress until input is consumed or output buffer is full
+            do {
+              output.dst = outbuf;
+              output.size = CHUNK;
+              output.pos = 0;
+
+              ec = ZSTD_decompressStream(dstream, &output, &input);
+
+              if (ZSTD_isError(ec)) {
+                ZSTD_freeDStream(dstream);
+                std::cerr << "Error: " << ZSTD_getErrorName(ec) << '\n';
+                throw std::runtime_error("ZSTD_decompressStream Failed");
+              }
+
+              // Append decompressed data to the output vector
+              have = output.pos;
+              out.insert(out.end(), outbuf, outbuf + have);
+            } while (input.pos < input.size);
+          }
+
+          // Clean up and free resources
+          ec = ZSTD_freeDStream(dstream);
+          if (ZSTD_isError(ec)) {
+            std::cerr << "Error: " << ZSTD_getErrorName(ec) << '\n';
+            throw std::runtime_error("ZSTD_freeDStream Failed");
+          }
         }
 
     }

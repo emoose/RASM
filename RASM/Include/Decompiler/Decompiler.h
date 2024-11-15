@@ -598,8 +598,8 @@ protected:
 #pragma endregion
 
 public:
-    DecompileRDR(GameTarget::GameTarget target) :
-        DecompileBase(target, 16384, false, false)
+    DecompileRDR(GameTarget::GameTarget target, bool isLittleEndian) :
+        DecompileBase(target, 16384, isLittleEndian, false)
     {
         SetOps(_CommonOpsIndexedByTargetOps);
     }
