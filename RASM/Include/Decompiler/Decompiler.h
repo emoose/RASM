@@ -269,7 +269,7 @@ protected:
         return position + 3 + Reader->ReadInt16(position + 1);
     }
 
-    //override gtaiv jump is 4 bytes
+    //override gtaiv jump is 4 bytes  rdr jump always big endian
     virtual inline void ReadJump(const char* opName)
     {
         CurrentOpSize = 3;
@@ -571,6 +571,8 @@ protected:
 #pragma endregion
 
 #pragma region Labels
+    void LogJumpLabel() override;
+    void LogSwitchLabel() override;
     void LogCallLabel(uint8_t callType = 0xFF) override;
 #pragma endregion
 
@@ -590,7 +592,8 @@ protected:
 #pragma endregion
 
 #pragma region Opcodes
-
+    void ReadJump(const char* opName) override;
+    void ReadSwitch() override;
     void ReadCallNative() override;
     void ReadCallCompact(uint8_t callType) override;
     void ReadReturnCompact(uint8_t returnType = 0xFF) override;

@@ -1028,8 +1028,15 @@ void DecompileBase::PrintJump(const char* opName, uint32_t index)
 {
     Out += opName;
     Out += " @Label_";
-    Out += std::to_string(JumpLabelIndexes[index]);
 
+    // Check if JumpLabelIndexes contains index first
+    // as accessing JumpLabelIndexes[index] will add index to JumpLabelIndexes if it doesn't exist...
+    if(JumpLabelIndexes.contains(index))
+      Out += std::to_string(JumpLabelIndexes[index]);
+    else
+    {
+      Out += "UNK_IDX_" + std::to_string(index);
+    }
 
     PrintVerbosePC();
     if (Options::DecompileOptions::Verbose)
@@ -1050,7 +1057,12 @@ void DecompileBase::PrintSwitch(std::vector<std::pair<int32_t, uint32_t>> caseAn
         Out += "[";
         Out += to_string(i.first);
         Out += " @Label_";
-        Out += to_string(JumpLabelIndexes[i.second]);
+        if (JumpLabelIndexes.contains(i.second))
+          Out += std::to_string(JumpLabelIndexes[i.second]);
+        else
+        {
+          Out += "UNK_IDX_" + std::to_string(i.second);
+        }
         Out += "]";
     }
 
@@ -1272,12 +1284,40 @@ void DecompileGTAIV::OpenScript(vector<uint8_t>& data)
 #pragma region DecompileRDR
 
 #pragma region Labels
+void DecompileRDR::LogJumpLabel()
+{
+  CurrentOpSize = 3;
+  auto offset = Reader->ReadInt16(CurrentReadPos + 1);
+  if (Options::Platform == Platform::PC)
+    offset = Utils::Bitwise::SwapEndian(offset);
+
+  JumpLabelIndexes.insert({ CurrentReadPos + 3 - CodeData.data() + offset, JumpLabelIndexes.size() });
+}
+
+void DecompileRDR::LogSwitchLabel()
+{
+  uint8_t caseCount = *(CurrentReadPos + 1);
+  CurrentOpSize = 2 + caseCount * 6;
+
+  for (uint32_t i = 0; i < caseCount; i++)
+  {
+    auto offset = Reader->ReadInt16(CurrentReadPos + 2 + i * 6 + 4);
+    if (Options::Platform == Platform::PC)
+      offset = Utils::Bitwise::SwapEndian(offset);
+    JumpLabelIndexes.insert({ (CurrentReadPos + 2 + i * 6 + 6) - CodeData.data() + offset, JumpLabelIndexes.size() });
+  }
+}
+
 void DecompileRDR::LogCallLabel(uint8_t callType)
 {
     CurrentOpSize = 3;
     if (callType >= 0 && callType <= 15)
     {
-        uint32_t FunctionIndex = GetCallOffset(Reader->ReadUInt16(CurrentReadPos + 1), callType);
+        auto offset = Reader->ReadUInt16(CurrentReadPos + 1);
+        if (Options::Platform == Platform::PC)
+          offset = Utils::Bitwise::SwapEndian(offset);
+
+        uint32_t FunctionIndex = GetCallOffset(offset, callType);
 
         if (CallLabelIndexes.find(FunctionIndex) == CallLabelIndexes.end())
         {
@@ -1307,6 +1347,44 @@ void DecompileRDR::LogCallLabel(uint8_t callType)
 
 #pragma region Opcodes
 
+
+void DecompileRDR::ReadJump(const char* opName)
+{
+  CurrentOpSize = 3;
+  auto offset = Reader->ReadInt16(CurrentReadPos + 1);
+  if (Options::Platform == Platform::PC)
+    offset = Utils::Bitwise::SwapEndian(offset);
+  PrintJump(opName, CurrentReadPos + 3 - CodeData.data() + offset);
+}
+
+void DecompileRDR::ReadSwitch()
+{
+  uint8_t caseCount = *(CurrentReadPos + 1);
+  CurrentOpSize = 2 + caseCount * 6;
+
+  vector<pair<int32_t, uint32_t>> caseAndIndex(caseCount);
+
+  for (uint32_t i = 0; i < caseCount; i++)
+  {
+    uint8_t* index = CurrentReadPos + 2 + i * 6;
+    uint32_t caseNum = Reader->ReadInt32(index);
+    uint16_t labelIndex = Reader->ReadInt16(index + 4);
+
+    if (Options::Platform == Platform::PC)
+    {
+      caseNum = Utils::Bitwise::SwapEndian(caseNum);
+      labelIndex = Utils::Bitwise::SwapEndian(labelIndex);
+    }
+
+    caseAndIndex[i] = {
+        caseNum,
+        (index + 6) - CodeData.data() + labelIndex
+    };
+  }
+
+  PrintSwitch(caseAndIndex);
+}
+
 void DecompileRDR::ReadCallNative()
 {
     CurrentOpSize = 3;
@@ -1323,7 +1401,11 @@ void DecompileRDR::ReadCallCompact(uint8_t callType)
     CurrentOpSize = 3;
     if (callType >= 0 && callType <= 15)
     {
-        int32_t callOffset = GetCallOffset(Reader->ReadUInt16(CurrentReadPos + 1), callType);
+        auto offset = Reader->ReadUInt16(CurrentReadPos + 1);
+        if (Options::Platform == Platform::PC)
+          offset = Utils::Bitwise::SwapEndian(offset);
+
+        int32_t callOffset = GetCallOffset(offset, callType);
 
         PrintCall(callOffset);
     }
