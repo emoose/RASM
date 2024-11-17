@@ -292,6 +292,30 @@ enum class Opcode : uint16_t
     SetSignature,
     Pad,
 
+    // rdr1 pc/nsw
+    PatchRet,
+    PatchTrap0,
+    PatchTrap1,
+    PatchTrap2,
+    PatchTrap3,
+    PatchTrap4,
+    PatchTrap5,
+    PatchTrap6,
+    PatchTrap7,
+    PatchTrap8,
+    PatchTrap9,
+    PatchTrapA,
+    PatchTrapB,
+    PatchTrapC,
+    PatchTrapD,
+    PatchTrapE,
+    PatchTrapF,
+    CallPatch,
+    CallOutOfPatch,
+    LoadRef,
+    StoreRef,
+    StoreVector,
+    MakeVector,
 
     //custom multi ops
     //GetArrayP,
@@ -556,7 +580,31 @@ const std::unordered_map<std::string, Opcode> OpcodeNamesUpper =
     { "SETIMM", Opcode::SetImm1 },
     { "GETGLOBALP", Opcode::GetGlobalP2 },
     { "GETGLOBAL", Opcode::GetGlobal2 },
-    { "SETGLOBAL", Opcode::SetGlobal2 }
+    { "SETGLOBAL", Opcode::SetGlobal2 },
+
+    { "PATCHRET", Opcode::PatchRet },
+    { "PATCHTRAP0", Opcode::PatchTrap0 },
+    { "PATCHTRAP1", Opcode::PatchTrap1 },
+    { "PATCHTRAP2", Opcode::PatchTrap2 },
+    { "PATCHTRAP3", Opcode::PatchTrap3 },
+    { "PATCHTRAP4", Opcode::PatchTrap4 },
+    { "PATCHTRAP5", Opcode::PatchTrap5 },
+    { "PATCHTRAP6", Opcode::PatchTrap6 },
+    { "PATCHTRAP7", Opcode::PatchTrap7 },
+    { "PATCHTRAP8", Opcode::PatchTrap8 },
+    { "PATCHTRAP9", Opcode::PatchTrap9 },
+    { "PATCHTRAPA", Opcode::PatchTrapA },
+    { "PATCHTRAPB", Opcode::PatchTrapB },
+    { "PATCHTRAPC", Opcode::PatchTrapC },
+    { "PATCHTRAPD", Opcode::PatchTrapD },
+    { "PATCHTRAPE", Opcode::PatchTrapE },
+    { "PATCHTRAPF", Opcode::PatchTrapF },
+    { "CALLPATCH", Opcode::CallPatch },
+    { "CALLOUTOFPATCH", Opcode::CallOutOfPatch },
+    { "LOADREF", Opcode::LoadRef },
+    { "STOREREF", Opcode::StoreRef },
+    { "STOREVECTOR", Opcode::StoreVector },
+    { "MAKEVECTOR", Opcode::MakeVector }
 
 };
 

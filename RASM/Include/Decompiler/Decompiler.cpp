@@ -554,6 +554,30 @@ void DecompileBase::GetCode(const string& asmOutPath)
         case Opcode::GetStatic3:    ReadUInt24("GetStatic"); break;
         case Opcode::SetStatic3:    ReadUInt24("SetStatic"); break;
 
+        case Opcode::PatchRet:        PrintSingleOp("PatchRet"); break;
+        case Opcode::PatchTrap0:      PrintSingleOp("PatchTrap0"); break;
+        case Opcode::PatchTrap1:      PrintSingleOp("PatchTrap1"); break;
+        case Opcode::PatchTrap2:      PrintSingleOp("PatchTrap2"); break;
+        case Opcode::PatchTrap3:      PrintSingleOp("PatchTrap3"); break;
+        case Opcode::PatchTrap4:      PrintSingleOp("PatchTrap4"); break;
+        case Opcode::PatchTrap5:      PrintSingleOp("PatchTrap5"); break;
+        case Opcode::PatchTrap6:      PrintSingleOp("PatchTrap6"); break;
+        case Opcode::PatchTrap7:      PrintSingleOp("PatchTrap7"); break;
+        case Opcode::PatchTrap8:      PrintSingleOp("PatchTrap8"); break;
+        case Opcode::PatchTrap9:      PrintSingleOp("PatchTrap9"); break;
+        case Opcode::PatchTrapA:      PrintSingleOp("PatchTrapA"); break;
+        case Opcode::PatchTrapB:      PrintSingleOp("PatchTrapB"); break;
+        case Opcode::PatchTrapC:      PrintSingleOp("PatchTrapC"); break;
+        case Opcode::PatchTrapD:      PrintSingleOp("PatchTrapD"); break;
+        case Opcode::PatchTrapE:      PrintSingleOp("PatchTrapE"); break;
+        case Opcode::PatchTrapF:      PrintSingleOp("PatchTrapF"); break;
+        case Opcode::CallPatch:       PrintSingleOp("CallPatch"); break;
+        case Opcode::CallOutOfPatch:  PrintSingleOp("CallOutOfPatch"); break;
+        case Opcode::LoadRef:         PrintSingleOp("LoadRef"); break;
+        case Opcode::StoreRef:        PrintSingleOp("StoreRef"); break;
+        case Opcode::StoreVector:     PrintSingleOp("StoreVector"); break;
+        case Opcode::MakeVector:      PrintSingleOp("MakeVector"); break;
+
 
         case Opcode::Uninitialized:
         default:
