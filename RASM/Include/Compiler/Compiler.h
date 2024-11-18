@@ -199,7 +199,8 @@ protected:
         }
 
         //RDR2 requires sorted cases
-        std::sort(casesAndLabels.begin(), casesAndLabels.end());
+        if (Options::GameTarget == GameTarget::RDR2)
+            std::sort(casesAndLabels.begin(), casesAndLabels.end());
         
         writeSwitch(casesAndLabels);
 

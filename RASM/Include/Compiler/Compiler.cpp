@@ -1865,7 +1865,10 @@ void CompileRDR::WriteScript(const std::string& scriptOutPath)
 
     for (auto i : Statics)
     {
-        script->WriteInt32(i);
+        auto value = i;
+        if (Options::Platform == Platform::PC) // PC must have statics in big-endian
+            value = Utils::Bitwise::SwapEndian(value);
+        script->WriteInt32(value);
     }
     script->Pad(16, 0xCD);
 

@@ -1099,7 +1099,7 @@ namespace Utils
             }
 
             // Initialize the compression stream with the default compression level
-            ec = ZSTD_initCStream(cstream, 2);
+            ec = ZSTD_initCStream(cstream, 6);
             if (ZSTD_isError(ec)) {
                 ZSTD_freeCStream(cstream);
                 std::cerr << "Error: " << ZSTD_getErrorName(ec) << '\n';
