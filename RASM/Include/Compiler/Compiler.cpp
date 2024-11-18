@@ -1112,6 +1112,29 @@ void CompileBase::ParseOpcode(Opcode op)
     case Opcode::GetGlobalPs:
     case Opcode::GetHash:
     case Opcode::PushStringNull:
+    case Opcode::PatchRet:
+    case Opcode::PatchTrap0:
+    case Opcode::PatchTrap1:
+    case Opcode::PatchTrap2:
+    case Opcode::PatchTrap3:
+    case Opcode::PatchTrap4:
+    case Opcode::PatchTrap5:
+    case Opcode::PatchTrap6:
+    case Opcode::PatchTrap7:
+    case Opcode::PatchTrap8:
+    case Opcode::PatchTrap9:
+    case Opcode::PatchTrapA:
+    case Opcode::PatchTrapB:
+    case Opcode::PatchTrapC:
+    case Opcode::PatchTrapD:
+    case Opcode::PatchTrapE:
+    case Opcode::PatchTrapF:
+    case Opcode::CallPatch:
+    case Opcode::CallOutOfPatch:
+    case Opcode::LoadRef:
+    case Opcode::StoreRef:
+    case Opcode::StoreVector:
+    case Opcode::MakeVector:
         AddSingleOp(op);
         break;
 
@@ -1816,76 +1839,81 @@ void CompileRDR::AddReturn()
 
 void CompileRDR::WriteScript(const std::string& scriptOutPath)
 {
-    DataBuilderBig script;
-    script.BlockSize = 16384;
+    std::unique_ptr<DataBuilder> script;
+    if (Options::Platform == Platform::PC)
+        script = std::make_unique<DataBuilderLit>();
+    else
+        script = std::make_unique<DataBuilderBig>();
 
-    script.Data.reserve(sizeof(RDRHeader) + CodeBuilder->Data.size() + Statics.size() * sizeof(uint32_t) + NativeIndexes.size() * sizeof(uint32_t) + script.BlockSize);
+    script->BlockSize = 16384;
 
-    uint32_t codeOffset = script.Data.size();
-    script.WriteData(CodeBuilder->Data.data(), CodeBuilder->Data.size());
-    script.Pad(16, 0xCD);
+    script->Data.reserve(sizeof(RDRHeader) + CodeBuilder->Data.size() + Statics.size() * sizeof(uint32_t) + NativeIndexes.size() * sizeof(uint32_t) + script->BlockSize);
 
-    uint32_t nativesOffset = script.Data.size();
-    script.PadDirect(NativeIndexes.size() * sizeof(uint32_t));
+    uint32_t codeOffset = script->Data.size();
+    script->WriteData(CodeBuilder->Data.data(), CodeBuilder->Data.size());
+    script->Pad(16, 0xCD);
+
+    uint32_t nativesOffset = script->Data.size();
+    script->PadDirect(NativeIndexes.size() * sizeof(uint32_t));
     for (auto i : NativeIndexes)
     {
-        script.SetUInt32((uint32_t)i.first, nativesOffset + i.second * sizeof(uint32_t));
+        script->SetUInt32((uint32_t)i.first, nativesOffset + i.second * sizeof(uint32_t));
     }
-    script.Pad(16, 0xCD);
+    script->Pad(16, 0xCD);
 
-    uint32_t staticsOffset = script.Data.size();
+    uint32_t staticsOffset = script->Data.size();
 
     for (auto i : Statics)
     {
-        script.WriteInt32(i);
+        script->WriteInt32(i);
     }
-    script.Pad(16, 0xCD);
+    script->Pad(16, 0xCD);
 
-    uint32_t codeBlocksOffset = script.Data.size();
+    uint32_t codeBlocksOffset = script->Data.size();
 
     for (int i = 0; i < CodeBuilder->Data.size(); i += CodeBuilder->BlockSize)
-        script.WriteUInt32(RelPtr(codeOffset + i).Value);
+        script->WriteUInt32(RelPtr(codeOffset + i).Value);
 
-    script.Pad(16, 0xCD);
+    script->Pad(16, 0xCD);
 
     uint32_t pageMap[8] = { 0, 0, 1, 0, 0, 0, 0, 0 };
-    uint32_t pageMapOffset = script.Data.size();
-    script.WriteData(pageMap, sizeof(uint32_t) * 8);
+    uint32_t pageMapOffset = script->Data.size();
+    script->WriteData(pageMap, sizeof(uint32_t) * 8);
 
 
 
-    uint32_t totalSize = script.Data.size() + sizeof(RDRHeader);
-    script.Data.resize(totalSize, 0xCD);
+    uint32_t totalSize = script->Data.size() + sizeof(RDRHeader);
+    script->Data.resize(totalSize, 0xCD);
 
     vector<uint32_t> DataSizePages = GetPageSizes(totalSize);
     uint32_t HeaderStartIndex = GetHeaderPagePos(DataSizePages);
-    if (totalSize != script.Data.size())
-        script.Data.resize(totalSize, 0xCD);
+    if (totalSize != script->Data.size())
+        script->Data.resize(totalSize, 0xCD);
 
     //poor mans header pos
     //should be shrunk
     while (HeaderStartIndex < pageMapOffset)
     {
-        totalSize = script.Data.size() + 16384;
-        script.Data.resize(totalSize, 0xCD);
+        totalSize = script->Data.size() + 16384;
+        script->Data.resize(totalSize, 0xCD);
 
         DataSizePages = GetPageSizes(totalSize);
         HeaderStartIndex = GetHeaderPagePos(DataSizePages);
-        if (totalSize != script.Data.size())
-            script.Data.resize(totalSize, 0xCD);
+        if (totalSize != script->Data.size())
+            script->Data.resize(totalSize, 0xCD);
     }
 
 
-    script.SetUInt32(0xA8D74300, HeaderStartIndex + offsetof(RDRHeader, PgBase));
-    script.SetUInt32((uint32_t)SignatureType, HeaderStartIndex + offsetof(RDRHeader, Signature));
-    script.SetUInt32((uint32_t)CodeBuilder->Data.size(), HeaderStartIndex + offsetof(RDRHeader, CodeLength));
-    script.SetUInt32(ParameterCount, HeaderStartIndex + offsetof(RDRHeader, ParameterCount));
-    script.SetUInt32(Statics.size(), HeaderStartIndex + offsetof(RDRHeader, StaticsCount));
-    script.SetUInt32(NativeIndexes.size(), HeaderStartIndex + offsetof(RDRHeader, NativesCount));
-    script.SetUInt32(RelPtr(nativesOffset).Value, HeaderStartIndex + offsetof(RDRHeader, NativesOffset));
-    script.SetUInt32(RelPtr(staticsOffset).Value, HeaderStartIndex + offsetof(RDRHeader, StaticsOffset));
-    script.SetUInt32(RelPtr(codeBlocksOffset).Value, HeaderStartIndex + offsetof(RDRHeader, CodeBlocksOffset));
-    script.SetUInt32(RelPtr(pageMapOffset).Value, HeaderStartIndex + offsetof(RDRHeader, PageMapOffset));
+    script->SetUInt32(Options::Platform == Platform::PC ? 0x0016E444 : 0xA8D74300, HeaderStartIndex + offsetof(RDRHeader, PgBase));
+    script->SetUInt32((uint32_t)SignatureType, HeaderStartIndex + offsetof(RDRHeader, Signature));
+    script->SetUInt32((uint32_t)CodeBuilder->Data.size(), HeaderStartIndex + offsetof(RDRHeader, CodeLength));
+    script->SetUInt32(ParameterCount, HeaderStartIndex + offsetof(RDRHeader, ParameterCount));
+    script->SetUInt32(Statics.size(), HeaderStartIndex + offsetof(RDRHeader, StaticsCount));
+    script->SetUInt32(NativeIndexes.size(), HeaderStartIndex + offsetof(RDRHeader, NativesCount));
+    script->SetUInt32(RelPtr(nativesOffset).Value, HeaderStartIndex + offsetof(RDRHeader, NativesOffset));
+    script->SetUInt32(RelPtr(staticsOffset).Value, HeaderStartIndex + offsetof(RDRHeader, StaticsOffset));
+    script->SetUInt32(RelPtr(codeBlocksOffset).Value, HeaderStartIndex + offsetof(RDRHeader, CodeBlocksOffset));
+    script->SetUInt32(RelPtr(pageMapOffset).Value, HeaderStartIndex + offsetof(RDRHeader, PageMapOffset));
 
 
     switch (Options::Platform)
@@ -1900,13 +1928,13 @@ void CompileRDR::WriteScript(const std::string& scriptOutPath)
         compressedData.SetUInt32(0x0FF512F1, 0);//LZX Signature?
 
 
-        Utils::Compression::XCompress_Compress(script.Data.data(), totalSize, compressedData.Data.data() + 8, &compressedSize);
+        Utils::Compression::XCompress_Compress(script->Data.data(), totalSize, compressedData.Data.data() + 8, &compressedSize);
 
         compressedData.Data.resize(compressedSize + 8);
 
         compressedData.SetUInt32(compressedSize, 4);
 
-        script.Data = compressedData.Data;
+        script->Data = compressedData.Data;
 
     }
     break;
@@ -1914,22 +1942,31 @@ void CompileRDR::WriteScript(const std::string& scriptOutPath)
     {
         vector<uint8_t> compressedData(totalSize);
 
-        Utils::Compression::ZLIB_CompressNew(script.Data, compressedData);
+        Utils::Compression::ZLIB_CompressNew(script->Data, compressedData);
 
-        script.Data = compressedData;
+        script->Data = compressedData;
+    }
+    break;
+    case Platform::PC:
+    {
+        vector<uint8_t> compressedData(totalSize);
+
+        Utils::Compression::ZSTD_CompressNew(script->Data, compressedData);
+
+        script->Data = compressedData;
     }
     break;
     }
 
 
-    if (!Utils::Crypt::AES_Encrypt(script.Data.data(), script.Data.size(), RDRKey))
+    if (!Utils::Crypt::AES_Encrypt(script->Data.data(), script->Data.size(), RDRKey))
         Utils::System::Throw("Encryption Failed");
 
 
     CSRHeader csr =
     {
-        Utils::Bitwise::SwapEndian(Options::Platform == Platform::XBOX ? 0x85435352u : 0x86435352u),
-        Utils::Bitwise::SwapEndian(0x00000002u)
+        Options::Platform == Platform::PC ? 0x85435352u : Utils::Bitwise::SwapEndian(Options::Platform == Platform::XBOX ? 0x85435352u : 0x86435352u),
+        Options::Platform == Platform::PC ? 0x00000002u : Utils::Bitwise::SwapEndian(0x00000002u)
     };
 
 
@@ -1938,14 +1975,17 @@ void CompileRDR::WriteScript(const std::string& scriptOutPath)
     csr.Flags.TotalVSize = totalSize >> 12;//platform dependent? (currently xbox)
     csr.Flags.ObjectStartPage = ObjectStartPageSizeToFlag(DataSizePages[DataSizePages.size() - 1]);
 
-    csr.Flags.Flag[0] = Utils::Bitwise::SwapEndian(csr.Flags.Flag[0]);
-    csr.Flags.Flag[1] = Utils::Bitwise::SwapEndian(csr.Flags.Flag[1]);
+    if (Options::Platform != Platform::PC)
+    {
+        csr.Flags.Flag[0] = Utils::Bitwise::SwapEndian(csr.Flags.Flag[0]);
+        csr.Flags.Flag[1] = Utils::Bitwise::SwapEndian(csr.Flags.Flag[1]);
+    }
 
     FILE* file = nullptr;
     if (Utils::IO::CreateFileWithDir(scriptOutPath.c_str(), file))
     {
         fwrite(&csr, 1, sizeof(csr), file);
-        fwrite(script.Data.data(), 1, script.Data.size(), file);
+        fwrite(script->Data.data(), 1, script->Data.size(), file);
         fclose(file);
     }
 
