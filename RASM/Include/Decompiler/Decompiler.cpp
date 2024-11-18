@@ -961,6 +961,12 @@ void DecompileBase::PrintCallNative(uint32_t nativeIndex, int32_t nativeParamCou
             Reader->ReadUInt64(reinterpret_cast<uint8_t*>((uint64_t*)CommonHeader.NativesOffset + nativeIndex)) :
             Reader->ReadUInt32(reinterpret_cast<uint8_t*>((uint32_t*)CommonHeader.NativesOffset + nativeIndex)));
 
+    // rdr1 pc keeps natives in little-endian
+    if (Options::Platform == Platform::PC && (Options::GameTarget == GameTarget::RDR || Options::GameTarget == GameTarget::RDR_SCO))
+    {
+        nativeValue = Utils::Bitwise::SwapEndian(uint32_t(nativeValue));
+    }
+
     if (NativeTranslationMap.size() > 0)
     {
         auto foundTransNative = NativeTranslationMap.find(nativeValue);
@@ -975,6 +981,11 @@ void DecompileBase::PrintCallNative(uint32_t nativeIndex, int32_t nativeParamCou
 
     auto foundNative = NativeMap.find(nativeValue);
 
+    // rdr1pc swap native value back before display
+    if (Options::Platform == Platform::PC && (Options::GameTarget == GameTarget::RDR || Options::GameTarget == GameTarget::RDR_SCO))
+    {
+        nativeValue = Utils::Bitwise::SwapEndian(uint32_t(nativeValue));
+    }
 
     if (foundNative != NativeMap.end())
     {
