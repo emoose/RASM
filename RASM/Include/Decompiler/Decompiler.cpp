@@ -554,6 +554,29 @@ void DecompileBase::GetCode(const string& asmOutPath)
         case Opcode::GetStatic3:    ReadUInt24("GetStatic"); break;
         case Opcode::SetStatic3:    ReadUInt24("SetStatic"); break;
 
+        case Opcode::PatchRet:        PrintSingleOp("PatchRet"); break;
+        case Opcode::PatchTrap0:      PrintSingleOp("PatchTrap0"); break;
+        case Opcode::PatchTrap1:      PrintSingleOp("PatchTrap1"); break;
+        case Opcode::PatchTrap2:      PrintSingleOp("PatchTrap2"); break;
+        case Opcode::PatchTrap3:      PrintSingleOp("PatchTrap3"); break;
+        case Opcode::PatchTrap4:      PrintSingleOp("PatchTrap4"); break;
+        case Opcode::PatchTrap5:      PrintSingleOp("PatchTrap5"); break;
+        case Opcode::PatchTrap6:      PrintSingleOp("PatchTrap6"); break;
+        case Opcode::PatchTrap7:      PrintSingleOp("PatchTrap7"); break;
+        case Opcode::PatchTrap8:      PrintSingleOp("PatchTrap8"); break;
+        case Opcode::PatchTrap9:      PrintSingleOp("PatchTrap9"); break;
+        case Opcode::PatchTrapA:      PrintSingleOp("PatchTrapA"); break;
+        case Opcode::PatchTrapB:      PrintSingleOp("PatchTrapB"); break;
+        case Opcode::PatchTrapC:      PrintSingleOp("PatchTrapC"); break;
+        case Opcode::PatchTrapD:      PrintSingleOp("PatchTrapD"); break;
+        case Opcode::PatchTrapE:      PrintSingleOp("PatchTrapE"); break;
+        case Opcode::PatchTrapF:      PrintSingleOp("PatchTrapF"); break;
+        case Opcode::CallPatch:       PrintSingleOp("CallPatch"); break;
+        case Opcode::CallOutOfPatch:  PrintSingleOp("CallOutOfPatch"); break;
+        case Opcode::LoadRef:         PrintSingleOp("LoadRef"); break;
+        case Opcode::StoreRef:        PrintSingleOp("StoreRef"); break;
+        case Opcode::StoreVector:     PrintSingleOp("StoreVector"); break;
+        case Opcode::MakeVector:      PrintSingleOp("MakeVector"); break;
 
         case Opcode::Uninitialized:
         default:
@@ -1330,12 +1353,18 @@ void DecompileRDR::OpenScript(vector<uint8_t>& data)
 {
     CurrentReadPos = data.data();
 
-    if (Reader->ReadUInt32(CurrentReadPos + offsetof(CSRHeader, ResourceType)) != 2)
+    std::unique_ptr<DataReader> HeaderReader;
+    if (Options::Platform == Platform::PC)
+        HeaderReader = std::make_unique<DataReaderLit>();
+    else
+        HeaderReader = std::make_unique<DataReaderBig>();
+
+    if (HeaderReader->ReadUInt32(CurrentReadPos + offsetof(CSRHeader, ResourceType)) != 2)
         Utils::System::Throw("Invalid Resource Type");
 
     RSCFlag flags = {
-        Reader->ReadUInt32(CurrentReadPos + offsetof(CSRHeader, Flags)),
-        Reader->ReadUInt32(CurrentReadPos + offsetof(CSRHeader, Flags) + 4)
+        HeaderReader->ReadUInt32(CurrentReadPos + offsetof(CSRHeader, Flags)),
+        HeaderReader->ReadUInt32(CurrentReadPos + offsetof(CSRHeader, Flags) + 4)
     };
     uint64_t decompressedSize = GetSizeFromFlag(flags.Flag[0], flags.Flag[1]);//index 12 = xcompress decompile size
 
@@ -1350,7 +1379,7 @@ void DecompileRDR::OpenScript(vector<uint8_t>& data)
     case Platform::XBOX:
     {
         vector<uint8_t> decompressedData(decompressedSize);
-        uint32_t compressedSize = Reader->ReadUInt32(CurrentReadPos + offsetof(CompressedHeader, CompressedSize));
+        uint32_t compressedSize = HeaderReader->ReadUInt32(CurrentReadPos + offsetof(CompressedHeader, CompressedSize));
 
         const uint32_t compressedDataStart = sizeof(CSRHeader) + sizeof(CompressedHeader);
         if (compressedSize != data.size() - compressedDataStart)
@@ -1375,6 +1404,15 @@ void DecompileRDR::OpenScript(vector<uint8_t>& data)
         memcpy(data.data(), decompressedData.data(), decompressedSize);
     }
     break;
+    case Platform::PC:
+    {
+        vector<uint8_t> decompressedData(decompressedSize);
+        Utils::Compression::ZSTD_DecompressNew(CurrentReadPos, data.size() - sizeof(CSRHeader), decompressedData);
+        decompressedSize = decompressedData.size();
+        data.resize(decompressedSize);
+        memcpy(data.data(), decompressedData.data(), decompressedSize);
+    }
+    break;
     }
 
     uint32_t headerLocation = GetObjectStartPageOffset(flags);
@@ -1388,38 +1426,40 @@ void DecompileRDR::OpenScript(vector<uint8_t>& data)
     else
         Utils::System::Throw("Invalid Header Location");
 
+    constexpr int MAGIC_CONSOLE = 0xA8D74300;
+    constexpr int MAGIC_PC = 0x0016E444;
 
-    auto unk = Reader->ReadUInt32(CurrentReadPos);
-    if (Reader->ReadUInt32(CurrentReadPos) != 0xA8D74300)
+    auto magic = HeaderReader->ReadUInt32(CurrentReadPos);
+    if (magic != MAGIC_CONSOLE && magic != MAGIC_PC)
         Utils::System::Throw("Header Not Found");
 
     CommonHeader.HeaderPtr = CurrentReadPos;
 
-    CommonHeader.CodeLength = Reader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, CodeLength));
+    CommonHeader.CodeLength = HeaderReader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, CodeLength));
 
     CommonHeader.TotalStringLength = 0;
     CommonHeader.StringBlocksCount = 0;
 
-    CommonHeader.NativesCount = Reader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, NativesCount));
-    CommonHeader.NativesOffset = RelPtr(Reader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, NativesOffset))).GetPtr<uint32_t>(data.data());
+    CommonHeader.NativesCount = HeaderReader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, NativesCount));
+    CommonHeader.NativesOffset = RelPtr(HeaderReader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, NativesOffset))).GetPtr<uint32_t>(data.data());
 
-    CommonHeader.StaticsCount = Reader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, StaticsCount));
-    CommonHeader.StaticsOffset = RelPtr(Reader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, StaticsOffset))).GetPtr<uint32_t>(data.data());
+    CommonHeader.StaticsCount = HeaderReader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, StaticsCount));
+    CommonHeader.StaticsOffset = RelPtr(HeaderReader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, StaticsOffset))).GetPtr<uint32_t>(data.data());
 
     CommonHeader.ScriptName = (char*)"";
 
-    CommonHeader.ParameterCount = Reader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, ParameterCount));
+    CommonHeader.ParameterCount = HeaderReader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, ParameterCount));
 
-    CommonHeader.Signature = (Signature)Reader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, Signature));
+    CommonHeader.Signature = (Signature)HeaderReader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, Signature));
 
     if (Options::DecompileOptions::Verbose)
     {
         VerboseComment("//Natives Count: ", CommonHeader.NativesCount);
         VerboseComment("//Code Length: ", CommonHeader.CodeLength);
-        VerboseComment("//Page Map Offset: ", Reader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, PageMapOffset)) & 0x0FFFFFFF);
-        VerboseComment("//Natives Offset: ", Reader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, NativesOffset)) & 0x0FFFFFFF);
-        VerboseComment("//Statics Offset: ", Reader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, StaticsOffset)) & 0x0FFFFFFF);
-        VerboseComment("//Code Blocks Offset: ", Reader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, CodeBlocksOffset)) & 0x0FFFFFFF);
+        VerboseComment("//Page Map Offset: ", HeaderReader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, PageMapOffset)) & 0x0FFFFFFF);
+        VerboseComment("//Natives Offset: ", HeaderReader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, NativesOffset)) & 0x0FFFFFFF);
+        VerboseComment("//Statics Offset: ", HeaderReader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, StaticsOffset)) & 0x0FFFFFFF);
+        VerboseComment("//Code Blocks Offset: ", HeaderReader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, CodeBlocksOffset)) & 0x0FFFFFFF);
 
     }
 
@@ -1427,14 +1467,14 @@ void DecompileRDR::OpenScript(vector<uint8_t>& data)
     CommonHeader.CodeBlocksCount = (CommonHeader.CodeLength + ((1 << 14) - 1)) >> 14;
     CommonHeader.CodeBlockOffsets.resize(CommonHeader.CodeBlocksCount);
 
-    uint32_t* codeBlocksOffset = RelPtr(Reader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, CodeBlocksOffset))).GetPtr<uint32_t>(data.data());
+    uint32_t* codeBlocksOffset = RelPtr(HeaderReader->ReadUInt32(CurrentReadPos + offsetof(RDRHeader, CodeBlocksOffset))).GetPtr<uint32_t>(data.data());
 
     for (uint32_t i = 0; i < CommonHeader.CodeBlocksCount; i++)
     {
-        RelPtr offset = RelPtr(Reader->ReadUInt32(reinterpret_cast<uint8_t*>(codeBlocksOffset + i)));
+        RelPtr offset = RelPtr(HeaderReader->ReadUInt32(reinterpret_cast<uint8_t*>(codeBlocksOffset + i)));
         CommonHeader.CodeBlockOffsets[i] = offset.GetPtr<uint8_t>(data.data());
         if (Options::DecompileOptions::Verbose)
-            VerboseComment("//Code Block Offset: ", Reader->ReadUInt32(codeBlocksOffset + i) & 0x0FFFFFFF);
+            VerboseComment("//Code Block Offset: ", HeaderReader->ReadUInt32(codeBlocksOffset + i) & 0x0FFFFFFF);
     }
 
 }

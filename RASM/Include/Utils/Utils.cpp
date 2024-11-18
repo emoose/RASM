@@ -11,11 +11,11 @@
 #include "ConsoleColor.h"
 #include <filesystem>
 #include <zlib.h>
+#include <zstd.h>
 #include "Compression/xcompress.h"
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/tokenizer.hpp>
 #include <unordered_map>
-
 
 using namespace std;
 using namespace Utils::System;
@@ -1017,6 +1017,149 @@ namespace Utils
             return "UNK_ERR" + to_string(errorcode);
         }
 
+        void ZSTD_DecompressNew(uint8_t* in, uint32_t inSize, std::vector<uint8_t>& out) {
+            size_t ec;
+            size_t have;
+            ZSTD_DStream* dstream = nullptr;
+            ZSTD_inBuffer input;
+            ZSTD_outBuffer output;
+            unsigned char outbuf[CHUNK];
+            uint32_t inIndex = 0;
+
+            out.clear();
+
+            // Create the decompression stream
+            dstream = ZSTD_createDStream();
+            if (!dstream) {
+                throw std::runtime_error("ZSTD_createDStream Failed");
+            }
+
+            // Initialize the decompression stream
+            ec = ZSTD_initDStream(dstream);
+            if (ZSTD_isError(ec)) {
+                ZSTD_freeDStream(dstream);
+                std::cerr << "Error: " << ZSTD_getErrorName(ec) << '\n';
+                throw std::runtime_error("ZSTD_initDStream Failed");
+            }
+
+            // Decompress the input data in chunks
+            while (inIndex < inSize) {
+                // Prepare the input buffer
+                uint32_t remaining = inSize - inIndex;
+                uint32_t sizeToCopy = remaining > CHUNK ? CHUNK : remaining;
+
+                input.src = in + inIndex;
+                input.size = sizeToCopy;
+                input.pos = 0;
+                inIndex += sizeToCopy;
+
+                // Decompress until input is consumed or output buffer is full
+                do {
+                    output.dst = outbuf;
+                    output.size = CHUNK;
+                    output.pos = 0;
+
+                    ec = ZSTD_decompressStream(dstream, &output, &input);
+
+                    if (ZSTD_isError(ec)) {
+                        ZSTD_freeDStream(dstream);
+                        std::cerr << "Error: " << ZSTD_getErrorName(ec) << '\n';
+                        throw std::runtime_error("ZSTD_decompressStream Failed");
+                    }
+
+                    // Append decompressed data to the output vector
+                    have = output.pos;
+                    out.insert(out.end(), outbuf, outbuf + have);
+                } while (input.pos < input.size);
+            }
+
+            // Clean up and free resources
+            ec = ZSTD_freeDStream(dstream);
+            if (ZSTD_isError(ec)) {
+                std::cerr << "Error: " << ZSTD_getErrorName(ec) << '\n';
+                throw std::runtime_error("ZSTD_freeDStream Failed");
+            }
+        }
+
+        void ZSTD_CompressNew(const std::vector<uint8_t>& in, std::vector<uint8_t>& out) {
+            size_t ec;
+            size_t have;
+            ZSTD_CStream* cstream = nullptr;
+            ZSTD_inBuffer input;
+            ZSTD_outBuffer output;
+            uint8_t outbuf[CHUNK];
+            uint32_t inIndex = 0;
+
+            out.clear();
+
+            // Create the compression stream
+            cstream = ZSTD_createCStream();
+            if (!cstream) {
+                throw std::runtime_error("ZSTD_createCStream Failed");
+            }
+
+            // Initialize the compression stream with the default compression level
+            ec = ZSTD_initCStream(cstream, 2);
+            if (ZSTD_isError(ec)) {
+                ZSTD_freeCStream(cstream);
+                std::cerr << "Error: " << ZSTD_getErrorName(ec) << '\n';
+                throw std::runtime_error("ZSTD_initCStream Failed");
+            }
+
+            // Compress the input data in chunks
+            while (inIndex < in.size()) {
+                // Prepare the input buffer
+                uint32_t remaining = in.size() - inIndex;
+                uint32_t sizeToCopy = remaining > CHUNK ? CHUNK : remaining;
+
+                input.src = in.data() + inIndex;
+                input.size = sizeToCopy;
+                input.pos = 0;
+                inIndex += sizeToCopy;
+
+                // Compress until input is consumed or output buffer is full
+                do {
+                    output.dst = outbuf;
+                    output.size = CHUNK;
+                    output.pos = 0;
+
+                    ec = ZSTD_compressStream(cstream, &output, &input);
+                    if (ZSTD_isError(ec)) {
+                        ZSTD_freeCStream(cstream);
+                        std::cerr << "Error: " << ZSTD_getErrorName(ec) << '\n';
+                        throw std::runtime_error("ZSTD_compressStream Failed");
+                    }
+
+                    // Append compressed data to the output vector
+                    have = output.pos;
+                    out.insert(out.end(), outbuf, outbuf + have);
+                } while (input.pos < input.size);
+            }
+
+            // Finalize the compression (flush remaining output)
+            do {
+                output.dst = outbuf;
+                output.size = CHUNK;
+                output.pos = 0;
+
+                ec = ZSTD_endStream(cstream, &output);
+                if (ZSTD_isError(ec)) {
+                    ZSTD_freeCStream(cstream);
+                    std::cerr << "Error: " << ZSTD_getErrorName(ec) << '\n';
+                    throw std::runtime_error("ZSTD_endStream Failed");
+                }
+
+                have = output.pos;
+                out.insert(out.end(), outbuf, outbuf + have);
+            } while (ec != 0);
+
+            // Clean up and free resources
+            ec = ZSTD_freeCStream(cstream);
+            if (ZSTD_isError(ec)) {
+                std::cerr << "Error: " << ZSTD_getErrorName(ec) << '\n';
+                throw std::runtime_error("ZSTD_freeCStream Failed");
+            }
+        }
     }
 
     namespace Crypt

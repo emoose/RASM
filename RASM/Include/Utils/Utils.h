@@ -173,6 +173,9 @@ namespace Utils
 		void ZLIB_CompressNew(const std::vector<uint8_t>& in, std::vector<uint8_t>& out);
 		void ZLIB_CompressChecksum(uint8_t* in, uint32_t inSize, uint8_t* out, uint32_t& outSize);
 		std::string ZLIB_ErrorCodeToStr(int32_t errorcode);
+
+		void ZSTD_DecompressNew(uint8_t* in, uint32_t inSize, std::vector<uint8_t>& out);
+		void ZSTD_CompressNew(const std::vector<uint8_t>& in, std::vector<uint8_t>& out);
 	}
 	namespace Crypt
 	{
