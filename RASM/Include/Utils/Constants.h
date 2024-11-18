@@ -473,7 +473,7 @@ const std::unordered_map<std::string, Opcode> OpcodeNamesUpper =
     {"PUSHSTRING", Opcode::PushString},
     {"PUSHSTRINGS", Opcode::PushStringS},
     {"PUSHARRAY", Opcode::PushArray},
-    //{"PUSHSTRINGNULL", Opcode::PushStringNull},
+    {"PUSHSTRINGNULL", Opcode::PushStringNull},
     {"GETHASH", Opcode::GetHash},
     {"STRCOPY", Opcode::StrCopy},
     {"ITOS", Opcode::ItoS},

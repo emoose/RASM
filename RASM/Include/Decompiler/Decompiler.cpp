@@ -470,7 +470,7 @@ void DecompileBase::GetCode(const string& asmOutPath)
         case Opcode::PushString:	ReadPushString(); break;
         case Opcode::PushStringS:	PrintSingleOp("PushStringS"); break;
         case Opcode::PushArray: 	ReadPushArray(); break;
-        case Opcode::PushStringNull:PrintSingleOp("PushString \"\""); break;
+        case Opcode::PushStringNull:PrintSingleOp("PushStringNull"); break;
         case Opcode::GetHash:		PrintSingleOp("GetHash"); break;
         case Opcode::StrCopy:		ReadUInt8("StrCopy"); break;
         case Opcode::ItoS:			ReadUInt8("ItoS"); break;

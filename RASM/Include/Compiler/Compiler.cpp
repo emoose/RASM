@@ -1111,6 +1111,7 @@ void CompileBase::ParseOpcode(Opcode op)
     case Opcode::SetGlobalSR:
     case Opcode::GetGlobalPs:
     case Opcode::GetHash:
+    case Opcode::PushStringNull:
         AddSingleOp(op);
         break;
 
