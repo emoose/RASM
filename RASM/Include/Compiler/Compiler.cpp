@@ -1745,10 +1745,10 @@ void CompileRDR::AddPushString()
         str.resize(0xFF - 1);
     }
 
+    FixCodePage(2 + str.size() + 1);
     AddSingleOp(Opcode::PushString);
     CodeBuilder->WriteUInt8(str.size() + 1);
     CodeBuilder->WriteString(str);
-
 }
 
 void CompileRDR::AddPushArray()
@@ -1761,11 +1761,14 @@ void CompileRDR::AddPushArray()
         hexData.resize(0xFFFFFFFF);
     }
 
-    AddSingleOp(Opcode::PushArray);
-    CodeBuilder->WriteUInt32(hexData.size());
-
     auto vec = Utils::DataConversion::HexToData(hexData);
-    CodeBuilder->WriteData(vec.data(), hexData.size());
+
+    FixCodePage(1 + 4 + vec.size());
+
+    AddSingleOp(Opcode::PushArray);
+    CodeBuilder->WriteUInt32(vec.size());
+
+    CodeBuilder->WriteData(vec.data(), vec.size());
 }
 
 void CompileRDR::AddCall()
