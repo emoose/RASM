@@ -861,8 +861,7 @@ void DecompileBase::PrintPush(int value, int value1, int value2)
 
 void DecompileBase::PrintPushF(float value)
 {
-    Out += "PushF ";
-    Out += std::to_string(value);
+    Out += std::format("PushF {}", value);
 
     PrintVerbosePC();
     Out += "\r\n";
