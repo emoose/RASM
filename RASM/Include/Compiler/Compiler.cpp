@@ -1856,16 +1856,23 @@ void CompileRDR::WriteScript(const std::string& scriptOutPath)
     script->WriteData(CodeBuilder->Data.data(), CodeBuilder->Data.size());
     script->Pad(16, 0xCD);
 
+    uint32_t nativesLength = NativeIndexes.size() * sizeof(uint32_t);
+    if (script->IsWriteOverPage(nativesLength))
+        script->PadPage(0xCD);
+
     uint32_t nativesOffset = script->Data.size();
-    script->PadDirect(NativeIndexes.size() * sizeof(uint32_t));
+    script->PadDirect(nativesLength);
     for (auto i : NativeIndexes)
     {
         script->SetUInt32((uint32_t)i.first, nativesOffset + i.second * sizeof(uint32_t));
     }
     script->Pad(16, 0xCD);
 
-    uint32_t staticsOffset = script->Data.size();
+    uint32_t staticsLength = Statics.size() * sizeof(uint32_t);
+    if (script->IsWriteOverPage(staticsLength))
+        script->PadPage(0xCD);
 
+    uint32_t staticsOffset = script->Data.size();
     for (auto i : Statics)
     {
         auto value = i;
