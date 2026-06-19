@@ -1438,9 +1438,10 @@ void DecompileRDR::OpenScript(vector<uint8_t>& data)
 
     constexpr int MAGIC_CONSOLE = 0xA8D74300;
     constexpr int MAGIC_PC = 0x0016E444;
+    constexpr int MAGIC_PC2 = 0x00ACE444; // New header value used in latest RDR1 update?
 
     auto magic = HeaderReader->ReadUInt32(CurrentReadPos);
-    if (magic != MAGIC_CONSOLE && magic != MAGIC_PC)
+    if (magic != MAGIC_CONSOLE && magic != MAGIC_PC && magic != MAGIC_PC2)
         Utils::System::Throw("Header Not Found");
 
     CommonHeader.HeaderPtr = CurrentReadPos;
